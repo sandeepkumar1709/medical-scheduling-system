@@ -4,7 +4,7 @@ A full-stack medical scheduling application that finds the optimal time slot for
 
 ## Demo & Presentation
 
-- **Video Walkthrough:** [YouTube — Solving Medical Scheduling with a Sliding Window Matrix Algorithm](YOUR_YOUTUBE_LINK_HERE)
+- **Video Walkthrough:** [YouTube — Solving Medical Scheduling with a Sliding Window Matrix Algorithm](https://www.youtube.com/watch?v=VPIBYKH7tRg)
 - **Presentation Slides:** [Presentation.pptx](./Presentation.pptx)
 
 ## Overview
