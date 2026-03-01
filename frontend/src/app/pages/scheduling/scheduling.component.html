@@ -1,0 +1,189 @@
+<div class="scheduling-container">
+  <!-- Header -->
+  <header class="header">
+    <h1>Medical Scheduling</h1>
+    <div class="header-actions">
+      <span *ngIf="isLoggedIn">Logged in</span>
+      <button *ngIf="isLoggedIn" (click)="logout()">Logout</button>
+      <a *ngIf="!isLoggedIn" routerLink="/login">Login</a>
+    </div>
+  </header>
+
+  <!-- Controls row -->
+  <div class="controls">
+    <div class="day-selector">
+      <label>Select Day:</label>
+      <select [(ngModel)]="selectedDay" (change)="onDayChange()">
+        <option *ngFor="let day of days; let i = index" [value]="i">{{ day }}</option>
+      </select>
+    </div>
+    
+    <div class="selection-actions" *ngIf="isLoggedIn && selectedCells.length > 0">
+      <span class="selection-count">{{ selectedCells.length }} slot(s) selected</span>
+      <button class="block-btn" (click)="blockSelectedSlots()" [disabled]="isSavingBlock">
+        {{ isSavingBlock ? 'Saving...' : 'Block' }}
+      </button>
+      <button class="unblock-btn" (click)="unblockSelectedSlots()" [disabled]="isSavingBlock">
+        {{ isSavingBlock ? 'Saving...' : 'Unblock' }}
+      </button>
+      <button class="clear-btn" (click)="clearSelection()">Clear</button>
+    </div>
+    
+    <span class="hint" *ngIf="isLoggedIn && selectedCells.length === 0">
+      Click or drag to select slots
+    </span>
+  </div>
+
+  <!-- Legend -->
+   <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-color free"></div>
+      <span>Available</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color blocked"></div>
+      <span>Blocked</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color booked"></div>
+      <span>Booked</span>
+    </div>
+    <div class="legend-item" *ngIf="optimalSlot?.found">
+      <div class="legend-color optimal"></div>
+      <span>Found Slot</span>
+    </div>
+  </div>
+
+
+  <!-- Main content: Grid + Sidebar -->
+  <div class="main-content">
+    <!-- Left: Availability Grid -->
+    <div class="grid-section">
+      <div class="grid-container" (mouseup)="onCellMouseUp()" (mouseleave)="onCellMouseUp()">
+        <div class="loading-overlay" *ngIf="isLoadingAvailability">
+          <div class="spinner"></div>
+          <span>Loading...</span>
+        </div>
+        
+        <table class="availability-grid" [class.loading]="isLoadingAvailability">
+          <thead>
+            <tr>
+              <th class="time-header">Time</th>
+              <th *ngFor="let party of availability" 
+                  [style.background-color]="party.party_color">
+                {{ party.party_name }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let time of timeSlots; let i = index">
+              <td class="time-cell">{{ time }}</td>
+              <td *ngFor="let party of availability"
+                  [class]="getSlotClass(party, i)"
+                  [class.selectable]="isLoggedIn && party.booking_slots[i] !== 1"
+                  [title]="getSlotTooltip(party, i)"
+                  (mousedown)="onCellMouseDown(party, i, $event)"
+                  (mouseenter)="onCellMouseEnter(party, i)">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: Sidebar with Care Path + Booking -->
+    <div class="sidebar">
+      <!-- Care Path Builder -->
+      <div class="care-path-section">
+        <h2>Build Care Path</h2>
+        
+        <div class="care-path-builder">
+          <select [(ngModel)]="selectedPartyId">
+  <option [value]="0">-- Gap (Wait Time) --</option>
+  <ng-container *ngFor="let party of availability">
+    <option *ngIf="party.party_id !== 3" [value]="party.party_id">
+      {{ party.party_name }}
+    </option>
+  </ng-container>
+</select>
+
+
+          
+          <select [(ngModel)]="selectedSlots">
+            <option *ngFor="let n of [1,2,3,4,5,6,7,8]" [value]="n">
+              {{ n }} slot(s) ({{ n * 15 }} min)
+            </option>
+          </select>
+          
+          <button (click)="addToCarePath()">Add</button>
+        </div>
+
+        <!-- Care Path Display -->
+        <div class="care-path-list" *ngIf="carePath.length > 0">
+          <div class="care-path-item" *ngFor="let item of carePath; let i = index">
+            <span>{{ i + 1 }}. {{ getPartyName(item.party_id) }} - {{ item.duration_slots }} slot(s)</span>
+            <button class="remove-btn" (click)="removeFromCarePath(i)">X</button>
+          </div>
+          <div class="care-path-total">
+            Total: {{ getTotalSlots() }} slots ({{ getTotalSlots() * 15 }} min)
+          </div>
+        </div>
+
+        <div class="empty-state" *ngIf="carePath.length === 0">
+          Add parties to build the care path
+        </div>
+      </div>
+
+      <!-- Booking Section -->
+      <div class="booking-section">
+        <h2>Book Appointment</h2>
+        
+        <div class="booking-form">
+          <input 
+            type="text" 
+            [(ngModel)]="patientName" 
+            placeholder="Patient Name"
+            [disabled]="isSearching || isBooking"
+          />
+          
+          <button 
+            class="find-btn"
+            (click)="findOptimal()" 
+            [disabled]="isSearching || carePath.length === 0">
+            <span class="spinner-small" *ngIf="isSearching"></span>
+            {{ isSearching ? 'Searching...' : 'Find Slot' }}
+          </button>
+        </div>
+
+        <!-- Optimal Slot Result -->
+        <div class="optimal-result" *ngIf="optimalSlot">
+          <div *ngIf="optimalSlot.found" class="success">
+            <div class="result-info">
+              <strong>Found!</strong> Starting at {{ formatSlotTime(optimalSlot.start_slot!) }}
+              <span class="end-time">to {{ formatSlotTime(optimalSlot.end_slot! + 1) }}</span>
+            </div>
+            <button 
+              (click)="bookAppointment()" 
+              [disabled]="isBooking || !patientName"
+              [title]="!patientName ? 'Please enter patient name first' : 'Confirm booking'">
+              <span class="spinner-small" *ngIf="isBooking"></span>
+              {{ isBooking ? 'Booking...' : 'Confirm' }}
+            </button>
+
+          </div>
+          <div *ngIf="!optimalSlot.found" class="error">
+            {{ optimalSlot.message }}
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div class="message" *ngIf="bookingMessage" 
+             [class.success]="bookingMessage.includes('successfully')"
+             [class.error]="!bookingMessage.includes('successfully')">
+          {{ bookingMessage }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

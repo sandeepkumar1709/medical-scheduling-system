@@ -1,0 +1,42 @@
+<div class="login-container">
+  <div class="login-card">
+    <h2>Medical Scheduling</h2>
+    <p class="subtitle">Sign in to continue</p>
+
+    <form (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input 
+          type="text" 
+          id="username" 
+          [(ngModel)]="username" 
+          name="username"
+          placeholder="Enter username"
+          [disabled]="isLoading"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input 
+          type="password" 
+          id="password" 
+          [(ngModel)]="password" 
+          name="password"
+          placeholder="Enter password"
+          [disabled]="isLoading"
+        />
+      </div>
+
+      <div class="error-message" *ngIf="errorMessage">
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" [disabled]="isLoading">
+        {{ isLoading ? 'Signing in...' : 'Sign In' }}
+      </button>
+    </form>
+
+    <p class="hint">Test: admin / admin123</p>
+  </div>
+</div>
